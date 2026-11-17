@@ -1,0 +1,28 @@
+{
+  "python": "3.11",
+  "verification": [
+    "python3.11",
+    "-B",
+    "run_checks.py"
+  ],
+  "demo": [
+    "python3.11",
+    "-B",
+    "run_checks.py",
+    "--demo"
+  ],
+  "samples": [
+    "samples/daily.json",
+    "samples/partner.warc"
+  ],
+  "api": {
+    "submit": "capture.jobs.JobService.submit",
+    "run": "capture.schedule.CaptureRunner.run",
+    "recover": "capture.schedule.CaptureRunner.reconcile",
+    "import_responses": "warc.importer.ResponseImporter.import_responses",
+    "replay": "review.replay.ReplayService.replay",
+    "verify_record": "review.verify.VerificationService.verify_record",
+    "export_batch": "review.export.ExportService.export_batch"
+  },
+  "data_directories": "Tests and demo create isolated temporary directories; normal API callers choose archive root and task SQLite path."
+}

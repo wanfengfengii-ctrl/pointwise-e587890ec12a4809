@@ -1,0 +1,15 @@
+WARC/1.1
+WARC-Type: response
+WARC-Record-ID: <urn:sample:partner>
+WARC-Target-URI: https://example.test/partner
+WARC-Date: 2026-01-02T03:04:05Z
+Content-Type: application/http; msgtype=response
+Content-Length: 85
+
+HTTP/1.1 200 OK
+Content-Type: text/plain; charset=UTF-8
+Content-Length: 6
+
+hello
+
+

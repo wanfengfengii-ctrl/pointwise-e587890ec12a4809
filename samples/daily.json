@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-01-02T03:04:05Z",
+  "requests": [
+    {
+      "job_id": "research-1",
+      "target": "https://example.test/research",
+      "status": 203,
+      "text": "研究资料\n甲乙\n"
+    },
+    {
+      "job_id": "research-empty",
+      "target": "https://example.test/empty",
+      "status": 204,
+      "text": ""
+    }
+  ]
+}
