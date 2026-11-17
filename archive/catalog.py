@@ -18,6 +18,7 @@ class StoredRecord:
     ref: BodyRef
     evidence_json: str
     text_bytes: bytes
+    refers_to: object = None
 
     @property
     def evidence(self):
@@ -52,10 +53,13 @@ class Catalog:
             if batch is None:
                 raise BatchNotFound(batch_id)
             rows = connection.execute("SELECT * FROM records WHERE batch_id=? ORDER BY ordinal", (batch_id,)).fetchall()
+            links = {row["record_id"]: row["refers_to"] for row in
+                     connection.execute("SELECT record_id, refers_to FROM links WHERE batch_id=?", (batch_id,)).fetchall()}
             records = tuple(StoredRecord(
                 row["record_id"], tuple(tuple(pair) for pair in json.loads(row["warc_json"])),
                 BodyRef(row["raw_digest"], row["raw_size"]),
-                row["evidence_json"], bytes(row["text_bytes"])) for row in rows)
+                row["evidence_json"], bytes(row["text_bytes"]),
+                links.get(row["record_id"])) for row in rows)
             return BatchSnapshot(batch_id, batch[0], records)
 
     def get_record(self, batch_id, record_id):

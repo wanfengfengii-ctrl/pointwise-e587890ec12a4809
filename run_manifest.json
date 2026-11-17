@@ -8,7 +8,7 @@
   "demo": [
     "python3.11",
     "-B",
-    "run_checks.py",
+    "revisit_checks.py",
     "--demo"
   ],
   "samples": [
@@ -20,6 +20,7 @@
     "run": "capture.schedule.CaptureRunner.run",
     "recover": "capture.schedule.CaptureRunner.reconcile",
     "import_responses": "warc.importer.ResponseImporter.import_responses",
+    "import_capture": "warc.importer.ResponseImporter.import_capture",
     "replay": "review.replay.ReplayService.replay",
     "verify_record": "review.verify.VerificationService.verify_record",
     "export_batch": "review.export.ExportService.export_batch"

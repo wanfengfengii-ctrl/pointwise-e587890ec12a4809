@@ -9,9 +9,11 @@ Python 3.11 标准库离线资料留存工程。采集员登记研究请求，�
 ```sh
 python3.11 -B run_checks.py
 python3.11 -B run_checks.py --demo
+python3.11 -B revisit_checks.py --verify
+python3.11 -B revisit_checks.py --demo
 ```
 
-第一条运行全部 unittest 回归，失败返回非零。第二条读取 samples/daily.json 与 samples/partner.warc，实际执行登记、采集、导入、重开、复核、导出和独立再导入。两者只使用各自创建的临时数据目录。运行入口同时登记在 .pointwise-runtime.json 和 run_manifest.json，无安装步骤。
+第一条运行全部 unittest 回归（含 tests/ 原回归与 revisit_checks.py 的联合业务核验），失败返回非零。第二条读取 samples/daily.json 与 samples/partner.warc，实际执行登记、采集、导入、重开、复核、导出和独立再导入。第三条独立核验 revisit 联合夹具，第四条展示 revisit 批次重开后的真实状态、文本、继承摘要与来源链。四者只使用各自创建的临时数据目录。运行入口同时登记在 .pointwise-runtime.json 和 run_manifest.json，无安装步骤。
 
 partner.warc 的原始 HTTP 块为 85 字节，SHA-256 为
 74fa5ea579a05bfbda983b7d9c004330a29437c33c45bcde1bc0e0fff0ed9ab4。
@@ -88,11 +90,21 @@ HTTP 仅接 HTTP/1.0 或 HTTP/1.1 的 200–599 最终状态、无折行的头�
 
 SHA-256 分别覆盖原始 HTTP、传输解码字节、内容解码字节和 UTF-8 文本；长度均以字节计。原始对象去重只节省存储，不合并 Record-ID。暂存和持久记录绑定本条完整响应，没有通用业务元数据槽。处理可全量物化，无吞吐、并发或峰值内存保证；没有网络抓取实现。
 
+## Revisit 正文层级与来源归属
+
+ResponseImporter.import_capture(chunks,batch_id) 在同批自包含 response 之外接纳同批 revisit 记录，返回原 BatchSnapshot。revisit 以 WARC-Refers-To 明确引用同批记录 ID，可前向、多跳，完整链末端必须是实体 response；相同正文摘要不能替代指定 Record-ID。revisit 的 HTTP 块只含状态行、有序头和结束头区的 CRLFCRLF，边界仅支持 Content-Length 且必须等于继承正文字节数。
+
+正文层级固定为：原始 HTTP 块（raw，本记录实际字节）→ 去除传输编码（transfer）→ 去除内容编码（body）→ UTF-8 文本（text）。revisit 记录的 raw、状态与有序头属于本记录；transfer 层正文继承来源链末端实体 response 的去传输编码字节，不沿用任何目标记录的状态、头或最终文本；body 与 text 按本记录自己的 Content-Encoding 与字符集解释。归档固定每条记录的来源关系，重开后不依赖输入包。ReplayResult 与 VerifiedRecord 的 source_chain 按从当前记录到实体 response 的次序给出记录 ID，response 为自身单元素链；raw_digest 始终是本记录原始 HTTP 块摘要，transfer_digest 是继承正文摘要，body_digest 是本记录内容解码正文摘要。每次复核与回放都重新读取链上各条原始证据，核对关系、正文摘要与缓存文本。
+
+重复 ID、缺目标、引用环、坏 profile、摘要错误、非法 HTTP、继承长度不符或解释失败均整批拒绝，旧成果不变；相同 batch_id 与相同有序原记录及关系重投幂等，改变顺序、WARC 元数据、原 HTTP 块或明确引用目标抛 BatchConflict。revisit 批次不开放导出；原 import_responses、采集回执恢复、复核与 response 批次导出行为不变。
+
 ## 回归覆盖
 
 tests/test_capture.py 覆盖两任务采集、身份冲突、领取互斥、空正文、预算、关闭重开及发布与任务落库之间的恢复。
 tests/test_import.py 覆盖逐字节/合并/空分片双记录、中文长度、chunked 加 trailer 承载 gzip、身份和坏编码拒绝、坏末记录整批保全。
 tests/test_archive.py 覆盖有序完整身份、重投冲突、目录提交失败、共享对象保全、重复初始化和版本拒绝。
 tests/test_review.py 覆盖固定读取、中文/空正文/同摘要异身份的独立再导入、短写和输出失败，以及原始对象被改动、截断、删除和缓存文本损坏的拒绝。
+tests/test_revisit.py 覆盖 response 摘要核对、单跳与多跳前向链、revisit 边界与头规则、同字节异身份、身份冲突、中间证据损坏和入口隔离。
+revisit_checks.py 以独立字节夹具核验前向链导入、整批拒绝保全、发布故障和链上原证据重验，并演示重开后的真实回放。
 
 Publisher 可注入 fault(event)，事件为 before_commit 与 after_commit；CaptureRunner 的 fault 在 after_publish 调用。端口异常用于受控验证中断边界；发布失败不伪装成功，已提交成果由固定回执恢复。

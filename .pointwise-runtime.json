@@ -10,7 +10,7 @@
   "demo": [
     "python3.11",
     "-B",
-    "run_checks.py",
+    "revisit_checks.py",
     "--demo"
   ]
 }

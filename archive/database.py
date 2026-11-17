@@ -32,6 +32,10 @@ class ArchiveDatabase:
                 raw_digest TEXT NOT NULL, raw_size INTEGER NOT NULL,
                 evidence_json TEXT NOT NULL, text_bytes BLOB NOT NULL,
                 PRIMARY KEY(batch_id, record_id), UNIQUE(batch_id, ordinal))""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS links (
+                batch_id TEXT NOT NULL REFERENCES batches(batch_id),
+                record_id TEXT NOT NULL, refers_to TEXT,
+                PRIMARY KEY(batch_id, record_id))""")
             connection.execute("""CREATE TABLE IF NOT EXISTS receipts (
                 job_id TEXT PRIMARY KEY, request_digest TEXT NOT NULL,
                 batch_id TEXT NOT NULL REFERENCES batches(batch_id), record_id TEXT NOT NULL)""")

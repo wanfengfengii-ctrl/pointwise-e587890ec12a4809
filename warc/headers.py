@@ -30,9 +30,15 @@ class WarcHeaders:
         return int(value)
 
 
-def validate_response_headers(headers):
-    supported = {"warc-type", "warc-record-id", "warc-target-uri", "warc-date",
-                 "content-type", "content-length", "warc-ip-address"}
+RESPONSE_FIELDS = {"warc-type", "warc-record-id", "warc-target-uri", "warc-date",
+                   "content-type", "content-length", "warc-ip-address"}
+CAPTURE_FIELDS = RESPONSE_FIELDS | {"warc-payload-digest", "warc-refers-to", "warc-profile"}
+REVISIT_PROFILE = "http://netpreserve.org/warc/1.1/revisit/identical-payload-digest"
+RECORD_ID_RULE = r"<[A-Za-z][A-Za-z0-9+.-]*:[^<>\s]+>"
+PAYLOAD_DIGEST_RULE = r"sha256:[0-9a-f]{64}"
+
+
+def _validate_common(headers, supported):
     for name, value in headers.fields:
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9-]+", name):
             raise WarcHeaderError("invalid WARC field name")
@@ -48,9 +54,7 @@ def validate_response_headers(headers):
             ipaddress.ip_address(addresses[0])
         except ValueError as exc:
             raise WarcHeaderError("invalid source IP address") from exc
-    if headers.one("WARC-Type") != "response":
-        raise WarcHeaderError("only self-contained response is supported")
-    if not re.fullmatch(r"<[A-Za-z][A-Za-z0-9+.-]*:[^<>\s]+>", headers.one("WARC-Record-ID")):
+    if not re.fullmatch(RECORD_ID_RULE, headers.one("WARC-Record-ID")):
         raise WarcHeaderError("invalid Record-ID")
     target = headers.one("WARC-Target-URI")
     parsed = urlsplit(target)
@@ -66,10 +70,39 @@ def validate_response_headers(headers):
     if headers.one("Content-Type").lower() != "application/http; msgtype=response":
         raise WarcHeaderError("HTTP response block type required")
     headers.content_length
+
+
+def validate_response_headers(headers):
+    _validate_common(headers, RESPONSE_FIELDS)
+    if headers.one("WARC-Type") != "response":
+        raise WarcHeaderError("only self-contained response is supported")
     return headers
 
 
-def parse_warc_headers(lines):
+def validate_capture_headers(headers):
+    _validate_common(headers, CAPTURE_FIELDS)
+    record_type = headers.one("WARC-Type")
+    digests = headers.values("WARC-Payload-Digest")
+    if len(digests) > 1:
+        raise WarcHeaderError("duplicate payload digest")
+    if digests and not re.fullmatch(PAYLOAD_DIGEST_RULE, digests[0]):
+        raise WarcHeaderError("invalid payload digest")
+    if record_type == "response":
+        if headers.values("WARC-Refers-To") or headers.values("WARC-Profile"):
+            raise WarcHeaderError("response must not carry reference or profile")
+    elif record_type == "revisit":
+        if not re.fullmatch(RECORD_ID_RULE, headers.one("WARC-Refers-To")):
+            raise WarcHeaderError("invalid reference target")
+        if headers.one("WARC-Profile") != REVISIT_PROFILE:
+            raise WarcHeaderError("unsupported revisit profile")
+        if not digests:
+            raise WarcHeaderError("revisit requires a payload digest")
+    else:
+        raise WarcHeaderError("only response and revisit are supported")
+    return headers
+
+
+def _parse_field_lines(lines):
     fields = []
     for line in lines:
         try:
@@ -77,7 +110,15 @@ def parse_warc_headers(lines):
         except (UnicodeError, ValueError) as exc:
             raise WarcHeaderError("invalid WARC field") from exc
         fields.append((name, value.strip(" ")))
-    return validate_response_headers(WarcHeaders(tuple(fields)))
+    return fields
+
+
+def parse_warc_headers(lines):
+    return validate_response_headers(WarcHeaders(tuple(_parse_field_lines(lines))))
+
+
+def parse_capture_headers(lines):
+    return validate_capture_headers(WarcHeaders(tuple(_parse_field_lines(lines))))
 
 
 def render_warc_headers(headers, length):

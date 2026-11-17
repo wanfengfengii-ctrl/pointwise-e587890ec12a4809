@@ -12,6 +12,7 @@ class ReplayResult:
     raw_digest: str
     transfer_digest: str
     body_digest: str
+    source_chain: tuple = ()
 
 
 class ReplayService:
@@ -24,4 +25,5 @@ class ReplayService:
         evidence = value.evidence()
         return ReplayResult(batch_id, record_id, value.status, value.headers, value.body,
                             verified.text_view.text, verified.raw_digest,
-                            evidence["transfer_digest"], evidence["body_digest"])
+                            evidence["transfer_digest"], evidence["body_digest"],
+                            verified.source_chain)

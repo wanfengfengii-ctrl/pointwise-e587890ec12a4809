@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from warc.headers import WarcHeaders, validate_response_headers, WarcHeaderError
+from warc.headers import WarcHeaders, validate_response_headers, validate_capture_headers, WarcHeaderError
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,48 @@ class ResponseRecord:
     @property
     def record_id(self):
         return self.headers.one("WARC-Record-ID")
+
+    @property
+    def refers_to(self):
+        return None
+
+    @property
+    def is_revisit(self):
+        return False
+
+
+@dataclass(frozen=True)
+class CaptureRecord:
+    headers: WarcHeaders
+    raw: bytes
+
+    def __post_init__(self):
+        validate_capture_headers(self.headers)
+        if not isinstance(self.raw, bytes) or self.headers.content_length != len(self.raw):
+            raise WarcHeaderError("record length differs from HTTP bytes")
+
+    @property
+    def record_id(self):
+        return self.headers.one("WARC-Record-ID")
+
+    @property
+    def refers_to(self):
+        values = self.headers.values("WARC-Refers-To")
+        return values[0] if values else None
+
+    @property
+    def is_revisit(self):
+        return self.headers.one("WARC-Type") == "revisit"
+
+
+def record_from_fields(warc_fields, raw):
+    headers = WarcHeaders(warc_fields)
+    if (headers.values("WARC-Type") == ("response",)
+            and not headers.values("WARC-Refers-To")
+            and not headers.values("WARC-Profile")
+            and not headers.values("WARC-Payload-Digest")):
+        return ResponseRecord(headers, raw)
+    return CaptureRecord(headers, raw)
 
 
 class RecordIdentitySet:

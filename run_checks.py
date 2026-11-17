@@ -85,7 +85,10 @@ def main():
     if args.demo:
         demo()
         return 0
-    suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent / "tests"), top_level_dir=str(Path(__file__).parent))
+    root = str(Path(__file__).parent)
+    suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent / "tests"), top_level_dir=root)
+    from revisit_checks import RevisitContract
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(RevisitContract))
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() else 1
 
